@@ -3,11 +3,12 @@ import pandas as pd
 import dash
 from dash import dcc
 from dash import html
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output
 import plotly.express as px
 from dash import dash_table
 import plotly.graph_objs as go
 
+# Pulling in all the cleansed data (probably should have kept all the related files in the same directory)
 df = pd.read_excel(r'C:\Users\garre\Desktop\Envisioneering\lab_results_cleaned.xlsx')
 by_month1 = pd.to_datetime(df['create_timestamp']).dt.to_period('M').value_counts().sort_index()
 by_month1.index = pd.PeriodIndex(by_month1.index)
@@ -40,6 +41,7 @@ df9 = pd.read_excel(r'C:\Users\garre\Desktop\Envisioneering\HIV_results.xlsx')
 
 df10 = pd.read_excel(r'C:\Users\garre\Desktop\Envisioneering\inr_cleaned.xlsx')
 
+# Defining all the figures used in the app layout
 fig = px.pie(df, names='Value Categories', title='A1C Values')
 fig.update_layout(title_x=0.49)
 
@@ -59,13 +61,13 @@ fig7.update_xaxes(title_text='')
 fig8 = px.histogram(df3, x='Origin', title="Origin")
 
 fig9 = px.pie(df3, names='Assigned To', title='Reentry Caseloads')
+fig9.update_layout(clickmode='event+select')
 
 fig10 = px.pie(df3, names='Number of Bookings', title='Number of Bookings')
 
 fig11 = px.pie(df3, names='Age Categories', title='Age Categories')
 
-fig12 = px.pie(df3, names='Gender', title='Gender')
-fig12.update_layout(clickmode='event+select')
+fig12 = px.sunburst(df3, path=["Gender"], title='Gender')
 
 fig13 = px.pie(df3, names='Race', title='Race')
 
@@ -99,11 +101,13 @@ fig22 = px.pie(df10, names='Results', title='International Normalized Ratio Resu
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
+# Initializing the app
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 image_logo = 'C:/Users/garre/Desktop/Envisioneering/logo.png'
 
 
+# Function to place OpenArms logo
 def b64_image(image_file_name):
     with open(image_file_name, 'rb') as f:
         image = f.read()
@@ -117,6 +121,7 @@ styles = {
     }
 }
 
+# Beginning of app layout (goes to line 401)
 app.layout = html.Div([
     html.Br(),
     html.Img(src=b64_image(image_logo), style={'textAlign': 'center', 'height': '20%', 'width': '20%'}),
@@ -160,11 +165,13 @@ app.layout = html.Div([
                 ]),
         dcc.Tab(label='Other Lab Results',
                 children=[
+                    html.Br(),
                     dcc.Dropdown(
                         id='filter_dropdown3',
                         options=[{"label": 'Hepatitis C', 'value': 'HEPC'},
                                  {'label': 'PT', 'value': 'PT'},
-                                 {'label': 'HIV', 'value': 'HIV'}],
+                                 {'label': 'HIV', 'value': 'HIV'},
+                                 {'label': 'INR', 'value': 'INR'}],
                         value='Hepatitis C'),
                     dcc.Graph(
                         id='basic-interactions19',
@@ -208,7 +215,6 @@ app.layout = html.Div([
                             page_size=10,
                             export_format='xlsx'),
                     ),
-
                 ]),
         dcc.Tab(label='Sick Call Monitoring',
                 children=[
@@ -247,7 +253,8 @@ app.layout = html.Div([
                     dcc.Graph(
                         id='basic-interactions5',
                         config={'editable': True},
-                        figure=fig5),
+                        figure=fig5,
+                    ),
 
                     dcc.Dropdown(
                         id='filter_dropdown1',
@@ -342,6 +349,7 @@ app.layout = html.Div([
                 children=[
                     html.Br(),
                     html.Br(),
+                    html.H4(id="title"),
 
                     dcc.Graph(
                         id='basic-interactions12',
@@ -359,12 +367,43 @@ app.layout = html.Div([
                         config={'editable': True},
                         figure=fig8,
                         style={'display': 'inline-block'}),
-                    html.Div(id='click-data')
+                    html.Div(
+                        dash_table.DataTable(
+                            id='click-data',
+                            columns=[{"name": i, "id": i} for i in df3.columns],
+                            data=df3.to_dict("records"),
+
+                        ))
                 ]),
+        dcc.Tab(label='Testing',
+                children=[
+                    html.Br(),
+                    html.Br(),
+                    html.H4(id="title1"),
+
+                    dcc.Graph(
+                        id='basic-interactions-test',
+                        config={'editable': True},
+                        figure=fig12, ),
+                    html.Div(
+                        dash_table.DataTable(
+                            id='click-data-test',
+                            columns=[{"name": i, "id": i} for i in df3.columns],
+                            data=df3.to_dict("records"),
+                            filter_action='native',
+                            sort_action='native',
+                            sort_mode='multi',
+                            row_selectable='multi',
+                            page_action='native',
+                            page_size=10,
+                            export_format='xlsx',
+                        ))
+                ])
     ])
 ])
 
 
+# Beginning of callbacks (first one is the A1C filter)
 @app.callback(
     Output('table-container', 'data'),
     [Input('filter_dropdown', 'value')])
@@ -373,6 +412,7 @@ def display_table(select_category):
     return dff.to_dict('records')
 
 
+# Callback for case manager filter
 @app.callback(
     Output('table-container1', 'data'),
     [Input('filter_dropdown1', 'value')])
@@ -381,12 +421,30 @@ def display_table(select_category1):
     return dff1.to_dict('records')
 
 
+# Callback for the testing tab with clickData filter by male and female
 @app.callback(
-    Output('click-data', 'children'),
-    [Input('basic-interactions12', 'selectedData')])
-def display_table(selectedData):
-    dff2 = df3[df3['Gender'] == selectedData]
-    return dff2.to_dict('records'),
+    [Output("click-data-test", "data"), Output("title1", "children")],
+    [Input("basic-interactions-test", "clickData")],
+)
+def update_table(clickData):
+    path = ['Gender']
+    click_path = "ALL"
+    data = df3.to_dict("records")
+    if clickData:
+        click_path = clickData["points"][0]["id"].split("/")
+        selected = dict(zip(path, click_path))
+
+        if "Gender" in selected:
+            dff2 = df3[
+                (df3["Gender"] == selected["Gender"])
+            ]
+        else:
+            dff2 = df3[(df3["Gender"] == selected["Gender"])]
+        data = dff2.to_dict("records")
+
+    title1 = f"Selected?: {' '.join(click_path)}"
+
+    return data, title1
 
 
 if __name__ == '__main__':
