@@ -1,5 +1,3 @@
-import os
-import base64
 import pandas as pd
 import dash
 from dash import dcc
@@ -8,6 +6,8 @@ from dash.dependencies import Input, Output
 import plotly.express as px
 from dash import dash_table
 import plotly.graph_objs as go
+import dash_bootstrap_components as dbc
+from whitenoise import WhiteNoise
 
 # Pulling in all the cleansed data
 df = pd.read_excel('lab_results_cleaned.xlsx')
@@ -113,11 +113,11 @@ fig26 = px.histogram(df11, y='Supervision_Risk_Score_First', color='Recidivism_W
 fig26.update_yaxes(tickmode='linear')
 
 fig27 = px.histogram(df11, x='Prison_Years', color='Recidivism_Within_3years', barmode='group', category_orders={
-    "Prison_Years":['Less than 1 year', '1-2 years', 'Greater than 2 to 3 years', 'More than 3 years']},
+    "Prison_Years": ['Less than 1 year', '1-2 years', 'Greater than 2 to 3 years', 'More than 3 years']},
                      title='Prison Sentence vs. Recidivate within 3 Years')
 
 fig28 = px.histogram(df11, x='Age_at_Release', color='Recidivism_Within_3years', barmode='group', category_orders={
-    "Age_at_Release":['18-22', '23-27', '28-32', '33-37', '38-42', '43-47', '48 or older']},
+    "Age_at_Release": ['18-22', '23-27', '28-32', '33-37', '38-42', '43-47', '48 or older']},
                      title='Age at Release vs. Recidivate within 3 Years')
 
 fig29 = px.histogram(df11, x='Prison_Offense', color='Recidivism_Within_3years', barmode='group',
@@ -131,23 +131,15 @@ fig31 = px.histogram(df11, x='Percent_Days_Employed', color='Recidivism_Within_3
 
 fig32 = px.histogram(df11, x='Jobs_Per_Year', color='Recidivism_Within_3years', barmode='stack',
                      title='Number of Jobs per Year vs. Recidivate within 3 Years')
-fig32.update_layout(xaxis_range=[.25,4])
-fig32.update_layout(yaxis_range=[1,2500])
+fig32.update_layout(xaxis_range=[.25, 4])
+fig32.update_layout(yaxis_range=[1, 2500])
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 # Initializing the app
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-
-image_logo = 'logo.png'
-
-
-# Function to place logo
-def b64_image(image_file_name):
-    with open(image_file_name, 'rb') as f:
-        image = f.read()
-    return 'data:image/png;base64,' + base64.b64encode(image).decode('utf-8')
-
+server = app.server
+server.wsgi_app = WhiteNoise(server.wsgi_app, root='static/')
 
 styles = {
     'pre': {
@@ -159,7 +151,7 @@ styles = {
 # Beginning of app layout (goes to line 507)
 app.layout = html.Div([
     html.Br(),
-    html.Img(src=b64_image(image_logo), style={'textAlign': 'center', 'height': '20%', 'width': '20%'}),
+    html.Img(src='logo.png', style={'textAlign': 'center', 'height': '20%', 'width': '20%'}),
     html.H1("Analytics Dashboards", style={'text-align': 'center', 'color': '#4FA1F3'}),
     dcc.Tabs([
         dcc.Tab(label='A1C Dashboard',
@@ -195,7 +187,7 @@ app.layout = html.Div([
                                          row_selectable='multi',
                                          page_action='native',
                                          page_size=20,
-                                       export_format='xlsx'),
+                                         export_format='xlsx'),
 
                 ]),
         dcc.Tab(label='Other Lab Results',
@@ -268,7 +260,7 @@ app.layout = html.Div([
                             style_data={'whiteSpace': 'normal', 'height': 'auto', 'lineHeight': '15px'},
                             id='table2',
                             columns=[{"name": i, "id": i} for i in df1.columns],
-                            data=df1.to_dict('records'),  # contents of data table
+                            data=df1.to_dict('records'),
                             filter_action='native',
                             sort_action='native',
                             sort_mode='multi',
@@ -281,6 +273,37 @@ app.layout = html.Div([
 
         dcc.Tab(label='Reentry Service Status',
                 children=[
+                    html.Br(),
+                    dbc.Card([dbc.CardImg(src="client.png", style={'height': '20%', 'width': '20%'}, top=True),
+                              dbc.CardBody([
+                                  html.H4("754", className="card-title"),
+                                  html.P("Client Registrations",
+                                         className="card-text", ),
+                              ]
+                              ),
+                              ],
+                             style={"width": "18rem", 'display': 'inline-block'},
+                             ),
+                    dbc.Card([dbc.CardImg(src="case.png", style={'height': '35%', 'width': '35%'}, top=True),
+                              dbc.CardBody([
+                                  html.H4("1,437", className="card-title"),
+                                  html.P("Case Encounters",
+                                         className="card-text", ),
+                              ]
+                              ),
+                              ],
+                             style={"width": "18rem", 'display': 'inline-block'},
+                             ),
+                    dbc.Card([dbc.CardImg(src="declined.png", style={'height': '25%', 'width': '25%'}, top=True),
+                              dbc.CardBody([
+                                  html.H4("27", className="card-title"),
+                                  html.P("Declined Services",
+                                         className="card-text", ),
+                              ]
+                              ),
+                              ],
+                             style={"width": "18rem", 'display': 'inline-block'},
+                             ),
                     dcc.Graph(
                         id='basic-interactions9',
                         config={'editable': True},
@@ -344,7 +367,7 @@ app.layout = html.Div([
                             style_data={'whiteSpace': 'normal', 'height': 'auto', 'lineHeight': '15px'},
                             id='table3',
                             columns=[{"name": i, "id": i} for i in df3.columns],
-                            data=df3.to_dict('records'),  # contents of data table
+                            data=df3.to_dict('records'),
                             filter_action='native',
                             sort_action='native',
                             sort_mode='multi',
