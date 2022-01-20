@@ -8,6 +8,7 @@ from dash import dash_table
 import plotly.graph_objs as go
 import dash_bootstrap_components as dbc
 from whitenoise import WhiteNoise
+import dash_auth
 
 # Pulling in all the cleansed data
 df = pd.read_excel('lab_results_cleaned.xlsx')
@@ -44,13 +45,19 @@ df10 = pd.read_excel('inr_cleaned.xlsx')
 
 df11 = pd.read_excel('NIJ_cleaned.xlsx')
 
+df12 = pd.read_excel('encounters_cleaned.xlsx')
+
+df13 = pd.read_excel('encounters_cleaned1.xlsx')
+
+df14 = pd.read_excel('encounters_cleaned2.xlsx')
+
 # Defining all the figures used in the app layout
 fig = px.pie(df, names='Value Categories', title='A1C Values')
 fig.update_layout(title_x=0.49)
 
 fig1 = px.pie(df1, names='Range Interval', title='Sick Call Range')
 
-fig2 = px.pie(df2, names='Within24Hrs', title='Booked to Intake Assessment')
+fig2 = px.sunburst(df2, path=["Within24Hrs"], title='Booked to Intake Assessment')
 
 fig3 = px.histogram(df3, x="Assigned To", color="Recid", title="Recidivism by Provider")
 
@@ -134,12 +141,26 @@ fig32 = px.histogram(df11, x='Jobs_Per_Year', color='Recidivism_Within_3years', 
 fig32.update_layout(xaxis_range=[.25, 4])
 fig32.update_layout(yaxis_range=[1, 2500])
 
+fig33 = px.line(df12, x='Date', y='Count', color='Venue', markers=True,
+                title='Encounter Visit Type')
+fig33.update_xaxes(dtick='M1', tickformat="%b\n%Y")
+
+fig34 = px.histogram(df13, x='Assigned To', y='Count', color='Venue', title='Encounters by Provider')
+
+fig35 = px.histogram(df14, x='Assigned To', y='Count', title='Declined Services by Provider',
+                     color_discrete_sequence=['indianred'])
+
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 # Initializing the app
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
 server.wsgi_app = WhiteNoise(server.wsgi_app, root='static/')
+
+auth = dash_auth.BasicAuth(
+    app,
+    {'~': '~'}
+)
 
 styles = {
     'pre': {
@@ -233,7 +254,7 @@ app.layout = html.Div([
                             style_data={'whiteSpace': 'normal', 'height': 'auto', 'lineHeight': '15px'},
                             id='table',
                             columns=[{"name": i, "id": i} for i in df2.columns],
-                            data=df2.to_dict('records'),  # contents of data table
+                            data=df2.to_dict('records'),
                             filter_action='native',
                             sort_action='native',
                             sort_mode='multi',
@@ -313,7 +334,6 @@ app.layout = html.Div([
                         config={'editable': True},
                         figure=fig5,
                     ),
-
                     dcc.Dropdown(
                         id='filter_dropdown1',
                         options=[{"label": v, 'value': v} for v in value_categories1],
@@ -330,6 +350,21 @@ app.layout = html.Div([
                                          page_size=20,
                                          export_format='xlsx'),
 
+                ]),
+        dcc.Tab(label='Encounters',
+                children=[
+                    dcc.Graph(
+                        id='basic-interactions33',
+                        config={'editable': True},
+                        figure=fig33),
+                    dcc.Graph(
+                        id='basic-interactions34',
+                        config={'editable': True},
+                        figure=fig34),
+                    dcc.Graph(
+                        id='basic-interactions35',
+                        config={'editable': True},
+                        figure=fig35),
                 ]),
         dcc.Tab(label='Recidivism Baseline',
                 children=[
@@ -550,28 +585,42 @@ def display_table(select_category1):
 
 # Callback for the testing tab with clickData filter by male and female
 @app.callback(
-    [Output("click-data-test", "data"), Output("title1", "children")],
+    Output("click-data-test", "data"),
     [Input("basic-interactions-test", "clickData")],
 )
 def update_table(clickData):
     path = ['Gender']
-    click_path = "ALL"
     data = df3.to_dict("records")
+    dff1 = []
     if clickData:
         click_path = clickData["points"][0]["id"].split("/")
         selected = dict(zip(path, click_path))
 
         if "Gender" in selected:
-            dff2 = df3[
-                (df3["Gender"] == selected["Gender"])
-            ]
-        else:
-            dff2 = df3[(df3["Gender"] == selected["Gender"])]
-        data = dff2.to_dict("records")
+            dff1 = df3[(df3["Gender"] == selected["Gender"])]
+        data = dff1.to_dict("records")
 
-    title1 = f"Selected?: {' '.join(click_path)}"
+    return data
 
-    return data, title1
+
+# Callback for Initial Clinical Intake Compliance Dashboard clickData
+@app.callback(
+    Output("table", "data"),
+    [Input("basic-interactions2", "clickData")],
+)
+def update_table1(clickData):
+    path = ['Within24Hrs']
+    data = df2.to_dict("records")
+    dff1 = []
+    if clickData:
+        click_path = clickData["points"][0]["id"].split("/")
+        selected = dict(zip(path, click_path))
+
+        if "Within24Hrs" in selected:
+            dff1 = df2[(df2["Within24Hrs"] == selected["Within24Hrs"])]
+        data = dff1.to_dict("records")
+
+    return data
 
 
 if __name__ == '__main__':
