@@ -170,7 +170,7 @@ server.wsgi_app = WhiteNoise(server.wsgi_app, root='static/')
 
 auth = dash_auth.BasicAuth(
     app,
-    {'guest': 'openarms'}
+    {'~': '~'}
 )
 
 modal = html.Div([
