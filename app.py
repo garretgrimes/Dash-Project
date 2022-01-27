@@ -2,13 +2,14 @@ import pandas as pd
 import dash
 from dash import dcc
 from dash import html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import plotly.express as px
 from dash import dash_table
 import plotly.graph_objs as go
 import dash_bootstrap_components as dbc
 from whitenoise import WhiteNoise
 import dash_auth
+import dash_daq as daq
 
 # Pulling in all the cleansed data
 df = pd.read_excel('lab_results_cleaned.xlsx')
@@ -52,8 +53,7 @@ df13 = pd.read_excel('encounters_cleaned1.xlsx')
 df14 = pd.read_excel('encounters_cleaned2.xlsx')
 
 # Defining all the figures used in the app layout
-fig = px.pie(df, names='Value Categories', title='A1C Values')
-fig.update_layout(title_x=0.49)
+fig = px.pie(df, names='Value Categories', title='A1C Values', hole=.5)
 
 fig1 = px.pie(df1, names='Range Interval', title='Sick Call Range')
 
@@ -150,65 +150,239 @@ fig34 = px.histogram(df13, x='Assigned To', y='Count', color='Venue', title='Enc
 fig35 = px.histogram(df14, x='Assigned To', y='Count', title='Declined Services by Provider',
                      color_discrete_sequence=['indianred'])
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+fig36 = go.Figure(go.Indicator(
+    domain={'x': [0, 1], 'y': [0, 1]},
+    value=27,
+    mode="gauge+number+delta",
+    title={'text': "A1C Labs Completed"},
+    delta={'reference': 220},
+    gauge={'axis': {'range': [None, 250]},
+           'steps': [
+               {'range': [0, 175], 'color': "rgb(203,213,232)"},
+               {'range': [175, 250], 'color': "gray"}],
+           'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 220}}))
+fig36.update_layout(title='Current Month')
 
 # Initializing the app
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 server.wsgi_app = WhiteNoise(server.wsgi_app, root='static/')
 
 auth = dash_auth.BasicAuth(
     app,
-    {'~': '~'}
+    {'guest': 'openarms'}
 )
 
-styles = {
-    'pre': {
-        'border': 'thin lightgrey solid',
-        'overflowX': 'scroll'
-    }
-}
+modal = html.Div([
+    dbc.Button("Open A1C Data Table", id="open", n_clicks=0, className="d-grid gap-2 col-2 mx-auto"),
+    dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle("A1C Values")),
+        dcc.Dropdown(
+            id='filter_dropdown',
+            options=[{"label": i, 'value': i} for i in value_categories],
+            value=value_categories[0], ),
+        html.Br(),
+        dcc.ConfirmDialogProvider(
+            children=html.Button('Transfer to?'), id='button',
+            message='This could be used to send the analysis that was completed to a workflow that could '
+                    'trigger other individuals to take action on the analysis that was conducted.'),
+        dbc.ModalBody(
+            dash_table.DataTable(
+                id='table9',
+                columns=[{"name": i, "id": i} for i in df.columns],
+                page_size=10,
+                data=df.to_dict('records'),
+                filter_action='native',
+                sort_action='native',
+                sort_mode='multi',
+                row_selectable='multi',
+                page_action='native',
+                export_format='xlsx',
+            )),
+        dbc.ModalFooter(
+            dbc.Button(
+                "Close", id="close", className="ms-auto", n_clicks=0
+            )
+        ),
+    ],
+        id="modal",
+        is_open=False,
+        size="xl",
+    ),
+])
 
-# Beginning of app layout (goes to line 507)
+cards = dbc.CardGroup(
+    [
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="757",
+                        id='led-4',
+                        size=64,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Client Registrations", className="card-title"),
+                ])
+        ),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="1483",
+                        id='led-5',
+                        size=64,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Case Encounters", className="card-title"),
+                ])
+        ),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="23",
+                        id='led-6',
+                        size=64,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Declined", className="card-title"),
+                ])
+        ),
+    ]
+)
+
+cards1 = dbc.CardGroup(
+    [
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="31",
+                        id='led-1',
+                        size=64,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Encounters This Month", className="card-title"),
+                ])
+        ),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="31",
+                        id='led-2',
+                        size=64,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Encounters Last Month", className="card-title"),
+                ])
+        ),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="0",
+                        id='led-3',
+                        size=64,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Percent Difference", className="card-title"),
+                ])
+        ),
+    ]
+)
+
+cards2 = dbc.CardGroup(
+    [
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="3820",
+                        id='led-7',
+                        size=35,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Total Patients", className="card-title"),
+                ])
+        ),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="1080",
+                        id='led-8',
+                        size=35,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Diabetic Patients", className="card-title"),
+                ])
+        ),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="152",
+                        id='led-9',
+                        size=35,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Newly Diagnosed", className="card-title"),
+                ])
+        ),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    daq.LEDDisplay(
+                        value="83.5",
+                        id='led-10',
+                        size=35,
+                        color='#4FA1F3',
+                        style={'display': 'inline-block', 'align': 'center'}),
+                    html.H2("Non-Compliance Rate %", className="card-title"),
+                ])
+        ),
+    ]
+)
+# Beginning of app layout
 app.layout = html.Div([
     html.Br(),
-    html.Img(src='logo.png', style={'textAlign': 'center', 'height': '20%', 'width': '20%'}),
+    html.A(
+        href="https://oafoundationweb.odoo.com/", target="_blank",
+        children=[
+            html.Img(src='logo.png', style={'textAlign': 'center', 'height': '20%', 'width': '20%'}),
+        ]),
     html.H1("Analytics Dashboards", style={'text-align': 'center', 'color': '#4FA1F3'}),
     dcc.Tabs([
         dcc.Tab(label='A1C Dashboard',
                 children=[
+                    html.Br(),
+                    html.Div(
+                        modal),
+                    html.Br(),
+                    html.Div(
+                        cards2),
+                    dcc.Graph(
+                        id='fig36',
+                        config={'editable': True},
+                        figure=fig36,
+                        style={'display': 'inline-block'}),
                     dcc.Graph(
                         id='basic-interactions',
                         config={'editable': True},
-                        figure=fig),
+                        figure=fig,
+                        style={'display': 'inline-block'}),
+                    html.Br(),
                     dcc.Graph(
                         id='basic-interactions15',
                         config={'editable': True},
-                        figure=fig15),
+                        figure=fig18),
                     dcc.Graph(
                         id='basic-interactions18',
                         config={'editable': True},
-                        figure=fig18),
-
-                    dcc.Dropdown(
-                        id='filter_dropdown',
-                        options=[{"label": v, 'value': v} for v in value_categories],
-                        value=value_categories[0],
-                    ),
-                    dcc.ConfirmDialogProvider(
-                        children=html.Button('Transfer to?'), id='button',
-                        message='This could be used to send the analysis that was completed to a workflow that could '
-                                'trigger other individuals to take action on the analysis that was conducted.'),
-
-                    dash_table.DataTable(id='table-container',
-                                         columns=[{'id': c, 'name': c} for c in df.columns.values],
-                                         filter_action='native',
-                                         sort_action='native',
-                                         sort_mode='multi',
-                                         row_selectable='multi',
-                                         page_action='native',
-                                         page_size=20,
-                                         export_format='xlsx'),
+                        figure=fig15),
+                    html.Br(),
 
                 ]),
         dcc.Tab(label='Other Lab Results',
@@ -216,10 +390,10 @@ app.layout = html.Div([
                     html.Br(),
                     dcc.Dropdown(
                         id='filter_dropdown3',
-                        options=[{"label": 'Hepatitis C', 'value': 'HEPC'},
-                                 {'label': 'PT', 'value': 'PT'},
-                                 {'label': 'HIV', 'value': 'HIV'},
-                                 {'label': 'INR', 'value': 'INR'}],
+                        options=[{"label": 'Hepatitis C', 'value': 'fig19'},
+                                 {'label': 'PT', 'value': 'fig20'},
+                                 {'label': 'HIV', 'value': 'fig21'},
+                                 {'label': 'INR', 'value': 'fig22'}],
                         value='Hepatitis C'),
                     dcc.Graph(
                         id='basic-interactions19',
@@ -295,36 +469,8 @@ app.layout = html.Div([
         dcc.Tab(label='Reentry Service Status',
                 children=[
                     html.Br(),
-                    dbc.Card([dbc.CardImg(src="client.png", style={'height': '20%', 'width': '20%'}, top=True),
-                              dbc.CardBody([
-                                  html.H4("754", className="card-title"),
-                                  html.P("Client Registrations",
-                                         className="card-text", ),
-                              ]
-                              ),
-                              ],
-                             style={"width": "18rem", 'display': 'inline-block'},
-                             ),
-                    dbc.Card([dbc.CardImg(src="case.png", style={'height': '35%', 'width': '35%'}, top=True),
-                              dbc.CardBody([
-                                  html.H4("1,437", className="card-title"),
-                                  html.P("Case Encounters",
-                                         className="card-text", ),
-                              ]
-                              ),
-                              ],
-                             style={"width": "18rem", 'display': 'inline-block'},
-                             ),
-                    dbc.Card([dbc.CardImg(src="declined.png", style={'height': '25%', 'width': '25%'}, top=True),
-                              dbc.CardBody([
-                                  html.H4("27", className="card-title"),
-                                  html.P("Declined Services",
-                                         className="card-text", ),
-                              ]
-                              ),
-                              ],
-                             style={"width": "18rem", 'display': 'inline-block'},
-                             ),
+                    html.Div(
+                        cards),
                     dcc.Graph(
                         id='basic-interactions9',
                         config={'editable': True},
@@ -353,6 +499,10 @@ app.layout = html.Div([
                 ]),
         dcc.Tab(label='Encounters',
                 children=[
+                    html.Br(),
+                    html.Div(
+                        cards1),
+                    html.Br(),
                     dcc.Graph(
                         id='basic-interactions33',
                         config={'editable': True},
@@ -468,30 +618,7 @@ app.layout = html.Div([
 
                         ))
                 ]),
-        dcc.Tab(label='Testing',
-                children=[
-                    html.Br(),
-                    html.Br(),
-                    html.H4(id="title1"),
 
-                    dcc.Graph(
-                        id='basic-interactions-test',
-                        config={'editable': True},
-                        figure=fig12, ),
-                    html.Div(
-                        dash_table.DataTable(
-                            id='click-data-test',
-                            columns=[{"name": i, "id": i} for i in df3.columns],
-                            data=df3.to_dict("records"),
-                            filter_action='native',
-                            sort_action='native',
-                            sort_mode='multi',
-                            row_selectable='multi',
-                            page_action='native',
-                            page_size=10,
-                            export_format='xlsx',
-                        )),
-                ]),
         dcc.Tab(label='Recidivism Charts',
                 children=[
                     html.Br(),
@@ -565,15 +692,6 @@ app.layout = html.Div([
 ])
 
 
-# Beginning of callbacks (first one is the A1C filter)
-@app.callback(
-    Output('table-container', 'data'),
-    [Input('filter_dropdown', 'value')])
-def display_table(select_category):
-    dff = df[df['Value Categories'] == select_category]
-    return dff.to_dict('records')
-
-
 # Callback for case manager filter
 @app.callback(
     Output('table-container1', 'data'),
@@ -581,26 +699,6 @@ def display_table(select_category):
 def display_table(select_category1):
     dff1 = df3[df3['Assigned To'] == select_category1]
     return dff1.to_dict('records')
-
-
-# Callback for the testing tab with clickData filter by male and female
-@app.callback(
-    Output("click-data-test", "data"),
-    [Input("basic-interactions-test", "clickData")],
-)
-def update_table(clickData):
-    path = ['Gender']
-    data = df3.to_dict("records")
-    dff1 = []
-    if clickData:
-        click_path = clickData["points"][0]["id"].split("/")
-        selected = dict(zip(path, click_path))
-
-        if "Gender" in selected:
-            dff1 = df3[(df3["Gender"] == selected["Gender"])]
-        data = dff1.to_dict("records")
-
-    return data
 
 
 # Callback for Initial Clinical Intake Compliance Dashboard clickData
@@ -621,6 +719,46 @@ def update_table1(clickData):
         data = dff1.to_dict("records")
 
     return data
+
+
+# Callback for Charge Counts histogram on Recidivism Baseline Tab
+@app.callback(
+    Output("table3", "data"),
+    [Input("basic-interactions7", "clickData")],
+)
+def update_table2(clickData):
+    path = ['Most Recent Charge Description']
+    data = df3.to_dict("records")
+    dff1 = []
+    if clickData:
+        click_path = clickData["points"][0]["x"].split("/")
+        selected = dict(zip(path, click_path))
+
+        if "Most Recent Charge Description" in selected:
+            dff1 = df3[(df3["Most Recent Charge Description"] == selected["Most Recent Charge Description"])]
+        data = dff1.to_dict("records")
+
+    return data
+
+
+@app.callback(
+    Output("modal", "is_open"),
+    [Input("open", "n_clicks"), Input("close", "n_clicks")],
+    [State("modal", "is_open")],
+)
+def toggle_modal(n1, n2, is_open):
+    if n1 or n2:
+        return not is_open
+    return is_open
+
+
+# A1C data table filter within modal
+@app.callback(
+    Output('table9', 'data'),
+    [Input('filter_dropdown', 'value')])
+def display_table(select_category):
+    dff1 = df[df['Value Categories'] == select_category]
+    return dff1.to_dict('records')
 
 
 if __name__ == '__main__':
